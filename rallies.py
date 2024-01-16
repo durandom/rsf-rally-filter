@@ -165,7 +165,11 @@ class RallyScraper:
                 # get the text of the onmouseover attribute
                 # split the text by the "Car Groups" string
                 # get the second part of the split
-                car_groups = td['onmouseover'].split('Car Groups')[1].split(':')[1].strip()
+                txt = td['onmouseover'].split('Car Groups')[1].split(':')[1].strip()
+                # remove "')" from the end of the string if it exists
+                if txt.endswith("')"):
+                    txt = txt[:-2]
+                car_groups = txt.split(', ')
             else:
                 car_groups = ""
             # get the text of the onmouseover attribute
@@ -191,18 +195,46 @@ class RallyScraper:
         self.parse_html()
 
 
-def main(refresh):
+def main(args):
     url = 'https://www.rallysimfans.hu/rbr/rally_online.php'
     scraper = RallyScraper(url)
-    scraper.scrape(refresh)
+    scraper.scrape(args.refresh)
+
     # for rally in scraper.rallies:
     #     print(rally)
 
     rsf = Rsf()
     rsf.parse_json()
 
+    car_group = None
+
+    if args.group:
+        group_name = args.group
+        car_group = next((car_group for car_group in rsf.car_groups if car_group.name == group_name), None)
+        if car_group:
+            print(f"Car Group: {car_group}")
+            for car in car_group.cars:
+                print(f"\t{car}")
+        else:
+            print(f"Car Group {group_name} not found")
+            # print all car groups
+            for car_group in rsf.car_groups:
+                print(f"\t{car_group}")
+
+    for rally in scraper.rallies:
+        # check if the rally has a car group
+        if rally.car_groups:
+            # check if the car group is found
+            if car_group:
+                # check if the car group is in the rally
+                if car_group.name in rally.car_groups:
+                    print(rally)
+            else:
+                print(rally)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Rally Data Scraper with Cache Option')
     parser.add_argument('--refresh', action='store_true', help='Refresh data by fetching new content')
+    parser.add_argument('--group', type=str, help='Filter rallies for a given car group')
     args = parser.parse_args()
-    main(args.refresh)
+    main(args)
