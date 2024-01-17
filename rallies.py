@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import argparse
 import os
 import json
-
+import re
 
 class Car:
     def __init__(self, **kwargs):
@@ -86,11 +86,13 @@ class Rsf:
 
 
 class Rally:
-    def __init__(self, status, name, description, sf, stages, creator, damage, open, results, car_groups):
+    def __init__(self, status, name, description, starts, finishs, legs, stages, creator, damage, open, results, car_groups):
         self.status = status
         self.name = name
         self.description = description
-        self.sf = sf
+        self.starts = starts
+        self.finishs = finishs
+        self.legs = legs
         self.stages = stages
         self.creator = creator
         self.damage = damage
@@ -98,8 +100,9 @@ class Rally:
         self.results = results
         self.car_groups = car_groups
 
+
     def __str__(self):
-        return f"Rally Name: {self.name}, Description: {self.description}, Car Groups: {self.car_groups}"
+        return f"{self.name}"
 class RallyScraper:
     def __init__(self, url, cache_file='rally_data_cache.html'):
         self.url = url
@@ -146,12 +149,17 @@ class RallyScraper:
             columns = row.find_all('td')
             # status is the content of the column with the class "rally_list_status"
             # find the td with the class "rally_list_status" and get the text
+            stages = self.parse_td(row, 'rally_list_stages')
+            # stages has the format "7/6"
+            # perform a regexp match to see if its the format
+
+            if not re.match(r'\d+\/\d+', stages):
+                continue
 
             status = self.parse_td(row, 'rally_list_status')
             name = self.parse_td(row, 'rally_list_name')
             description = self.parse_td(row, 'rally_list_description')
             sf = self.parse_td(row, 'rally_list_sf')
-            stages = self.parse_td(row, 'rally_list_stages')
             creator = self.parse_td(row, 'rally_list_creator')
             damage = self.parse_td(row, 'rally_list_damage')
             open = self.parse_td(row, 'rally_list_open')
@@ -172,11 +180,18 @@ class RallyScraper:
                 car_groups = txt.split(', ')
             else:
                 car_groups = ""
-            # get the text of the onmouseover attribute
-            # split the text by the "Car Groups" string
-            # get the second part of the split
 
-            rally = Rally(status, name, description, sf, stages, creator, damage, open, results, car_groups)
+            legs = int(stages.split('/')[1])
+            stages = int(stages.split('/')[0])
+
+            if sf == "":
+                starts = 0
+                finishs = 0
+            else:
+                starts = int(sf.split('/')[0])
+                finishs = int(sf.split('/')[1])
+
+            rally = Rally(status, name, description, starts, finishs, legs, stages, creator, damage, open, results, car_groups)
             self.rallies.append(rally)
 
     def refresh_data(self, refresh):
@@ -221,6 +236,8 @@ def main(args):
             for car_group in rsf.car_groups:
                 print(f"\t{car_group}")
 
+    filter_rallies = []
+
     for rally in scraper.rallies:
         # check if the rally has a car group
         if rally.car_groups:
@@ -228,9 +245,22 @@ def main(args):
             if car_group:
                 # check if the car group is in the rally
                 if car_group.name in rally.car_groups:
-                    print(rally)
+                    filter_rallies.append(rally)
             else:
-                print(rally)
+                filter_rallies.append(rally)
+
+    # order rallies by name
+    filter_rallies.sort(key=lambda x: x.name)
+    filter_rallies.sort(key=lambda x: x.starts)
+
+    for rally in filter_rallies:
+        txt = f"""
+{rally.name}
+\t{rally.description}
+\t{rally.starts} starter / {rally.finishs} finisher
+\t{rally.legs} legs, {rally.stages} stages
+"""
+        print(txt)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Rally Data Scraper with Cache Option')
