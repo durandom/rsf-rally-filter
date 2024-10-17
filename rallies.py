@@ -14,20 +14,19 @@ def main(args):
 
     car_group = None
 
+    ui = RallyUI()
+
     if args.group:
         group_name = args.group
         car_group = next((car_group for car_group in rsf.car_groups if car_group.name == group_name), None)
-
-    ui = RallyUI()
-
-    if car_group:
-        ui.display_car_group(car_group)
-    else:
-        # print all car groups
-        for car_group in rsf.car_groups:
+        if car_group:
             ui.display_car_group(car_group)
+        else:
+            # print all car groups
+            for car_group in rsf.car_groups:
+                ui.display_car_group(car_group)
 
-    ui.display_rallies(scraper.rallies)
+    ui.display_rallies(scraper.rallies, car_group)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Rally Data Scraper with Cache Option')
